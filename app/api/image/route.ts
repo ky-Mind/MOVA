@@ -14,16 +14,22 @@ const VALID_ASPECT_RATIOS: ImageAspectRatio[] = [
 
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json();
+    const formData = await request.formData();
+
+    const promptValue = formData.get("prompt");
+    const aspectValue = formData.get("aspectRatio");
 
     const prompt =
-      typeof body.prompt === "string"
-        ? body.prompt.trim()
+      typeof promptValue === "string"
+        ? promptValue.trim()
         : "";
 
     const aspectRatio: ImageAspectRatio =
-      VALID_ASPECT_RATIOS.includes(body.aspectRatio)
-        ? body.aspectRatio
+      typeof aspectValue === "string" &&
+      VALID_ASPECT_RATIOS.includes(
+        aspectValue as ImageAspectRatio
+      )
+        ? (aspectValue as ImageAspectRatio)
         : "9:16";
 
     if (!prompt) {
@@ -40,9 +46,7 @@ export async function POST(request: NextRequest) {
     const result = await generateImage({
       prompt,
       aspectRatio,
-      referenceImages: Array.isArray(body.referenceImages)
-        ? body.referenceImages
-        : [],
+      referenceImages: [],
     });
 
     const imageBuffer = Buffer.from(
