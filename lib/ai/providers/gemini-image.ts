@@ -29,7 +29,7 @@ export class GeminiImageProvider implements ImageProvider {
       model: "gemini-3.1-flash-image",
       contents: input.prompt,
       config: {
-        responseModalities: ["TEXT", "IMAGE"],
+        responseModalities: ["IMAGE"],
         imageConfig: {
           aspectRatio: input.aspectRatio,
         },
@@ -39,17 +39,10 @@ export class GeminiImageProvider implements ImageProvider {
     const parts = response.candidates?.[0]?.content?.parts ?? [];
 
     for (const part of parts) {
-      const inlineData = part.inlineData;
-
-      if (inlineData?.data) {
-        const mimeType =
-          inlineData.mimeType === "image/png"
-            ? "image/png"
-            : "image/jpeg";
-
+      if (part.inlineData?.data) {
         return {
-          imageData: inlineData.data,
-          mimeType,
+          imageData: part.inlineData.data,
+          mimeType: "image/jpeg",
           provider: this.name,
         };
       }
