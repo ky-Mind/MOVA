@@ -1,30 +1,80 @@
-import { NextResponse } from "next/server";
-import { gemini } from "@/lib/gemini";
+import { NextRequest, NextResponse } from "next/server";
+import { generateImage } from "@/lib/ai/router";
+import { ImageAspectRatio } from "@/lib/ai/types";
 
 export const runtime = "nodejs";
-export const maxDuration = 60;
 
-export async function POST(req: Request) {
+const VALID_ASPECT_RATIOS: ImageAspectRatio[] = [
+  "1:1",
+  "16:9",
+  "9:16",
+  "4:3",
+  "3:4",
+];
+
+export async function POST(request: NextRequest) {
   try {
-    const form = await req.formData();
-    const prompt = String(form.get("prompt") || "").trim();
-    const aspect = String(form.get("aspectRatio") || "9:16");
-    const files = form.getAll("files").filter((x): x is File => x instanceof File);
-    if (!prompt) return NextResponse.json({ error: "Prompt kosong." }, { status: 400 });
-    const ai = gemini();
-    const input: any[] = [{ type: "text", text: prompt }];
-    for (const f of files.slice(0, 6)) {
-      if (f.type.startsWith("image/")) input.push({ type: "image", data: Buffer.from(await f.arrayBuffer()).toString("base64"), mime_type: f.type });
+    const body = await request.json();
+
+    const prompt =
+      typeof body.prompt === "string"
+        ? body.prompt.trim()
+        : "";
+
+    const aspectRatio: ImageAspectRatio =
+      VALID_ASPECT_RATIOS.includes(body.aspectRatio)
+        ? body.aspectRatio
+        : "9:16";
+
+    if (!prompt) {
+      return NextResponse.json(
+        {
+          error: "Prompt is required",
+        },
+        {
+          status: 400,
+        }
+      );
     }
-    const interaction = await ai.interactions.create({
-      model: "gemini-3.1-flash-image",
-      input,
-      response_format: { type: "image", mime_type: "image/jpeg", aspect_ratio: aspect, image_size: "1K" },
+
+    const result = await generateImage({
+      prompt,
+      aspectRatio,
+      referenceImages: Array.isArray(body.referenceImages)
+        ? body.referenceImages
+        : [],
     });
-    const data = interaction.output_image?.data;
-    if (!data) throw new Error("Model tidak mengembalikan gambar.");
-    return new Response(Buffer.from(data, "base64"), { headers: { "Content-Type": "image/png", "Cache-Control": "no-store" } });
-  } catch (e) {
-    return NextResponse.json({ error: e instanceof Error ? e.message : "Image generation error" }, { status: 500 });
+
+    const imageBuffer = Buffer.from(
+      result.imageData,
+      "base64"
+    );
+
+    return new NextResponse(imageBuffer, {
+      status: 200,
+      headers: {
+        "Content-Type": result.mimeType,
+        "Content-Disposition":
+          'inline; filename="mova-generated-image.jpg"',
+        "Cache-Control":
+          "no-store, no-cache, must-revalidate",
+      },
+    });
+  } catch (error) {
+    console.error("[MOVA IMAGE API]", error);
+
+    const message =
+      error instanceof Error
+        ? error.message
+        : "Image generation failed";
+
+    return NextResponse.json(
+      {
+        error: message,
+      },
+      {
+        status: 500,
+      }
+    );
   }
 }
