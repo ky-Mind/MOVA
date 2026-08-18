@@ -19,7 +19,7 @@ export async function POST(req: Request) {
     const interaction = await ai.interactions.create({
       model: "gemini-3.1-flash-image",
       input,
-      response_format: { type: "image", mime_type: "image/png", aspect_ratio: aspect, image_size: "1K" },
+      response_format: { type: "image", mime_type: "image/jpeg", aspect_ratio: aspect, image_size: "1K" },
     });
     const data = interaction.output_image?.data;
     if (!data) throw new Error("Model tidak mengembalikan gambar.");
